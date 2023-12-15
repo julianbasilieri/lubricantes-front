@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Subir Archivo Excel</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.3/xlsx.full.min.js"></script>
+</head>
+<body>
+<input type="file" id="fileInput" accept=".xlsx, .xls">
+<button onclick="leerArchivo()">Aceptar</button>
+
+<script>
+    function leerArchivo() {
+        const fileInput = document.getElementById('fileInput');
+        const file = fileInput.files[0];
+
+        if (file) {
+            const reader = new FileReader();
+
+            reader.onload = function (e) {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+
+                // Define las columnas que te interesan
+                const columnas = ['A', 'B', 'G', 'K', 'M', 'P'];
+
+                // Array para almacenar los datos
+                const datos = [];
+
+                // Empieza desde la fila 16
+                let fila = 16;
+
+                // Bucle para recorrer las filas y obtener los datos
+                while (worksheet['A' + fila]) {
+                    const articulo = {};
+
+                    // Define las columnas con los nombres deseados
+                    const columnasConNombres = {
+                        'A': 'id',
+                        'B': 'denominacion',
+                        'G': 'denominacionExtendida',
+                        'K': 'stock',
+                        'M': 'precio',
+                        'P': 'fechaModificacion'
+                    };
+
+                    // Recorre las columnas con nombres deseados
+                    for (const [columna, nombre] of Object.entries(columnasConNombres)) {
+                        const celda = columna + fila;
+                        if (columna === 'P' && worksheet[celda]) {
+                            // Si la columna es 'M' (fecha modificacion) y hay un valor
+                            const fechaSerial = worksheet[celda].v;
+                            const fechaFormateada = XLSX.SSF.format('dd/mm/yyyy', fechaSerial);
+                            articulo[nombre] = fechaFormateada;
+                        } else {
+                            articulo[nombre] = worksheet[celda] ? worksheet[celda].v : null;
+                        }
+                    }
+
+
+                    datos.push(articulo);
+                    fila++;
+                }
+
+                // Muestra los datos por consola
+                console.log(datos);
+
+                const apiUrl = 'http://localhost:8080/api/articulos/list'; // Reemplaza con tu URL
+                fetch(apiUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(datos),
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        console.log('Respuesta del servidor:', data);
+                        // Puedes realizar acciones adicionales con la respuesta del servidor si es necesario
+                    })
+                    .catch(error => {
+                        console.error('Error al enviar los datos:', error);
+                    });
+            };
+
+            reader.readAsArrayBuffer(file);
+        } else {
+            alert('Por favor, selecciona un archivo.');
+        }
+    }
+</script>
+</body>
+</html>
